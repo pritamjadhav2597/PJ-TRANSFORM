@@ -35,7 +35,7 @@
   let appHasStarted = false;
 
   async function startApp() {
-    await Seed.seedCreatorIfMissing();
+    await Seed.ensureCurrentUser();
     await Router.init();
   }
 
