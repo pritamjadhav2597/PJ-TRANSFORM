@@ -1,12 +1,23 @@
 /**
- * app.js — bootstraps the app:
- *   1. Verifies local storage is available.
- *   2. If Supabase is configured, waits for its first auth event and reacts
- *      to it: PASSWORD_RECOVERY -> "set new password" screen, an existing
- *      session -> straight into the app, no session -> sign-in screen.
- *   3. From then on, a SIGNED_OUT event reloads back to the sign-in screen.
- *   4. Pulls the signed-in user's cloud data down, seeds a starter profile
- *      on first run, then starts the router.
+ * app.js — bootstraps the app.
+ *
+ * IMPORTANT: this app's own router (router.js) uses the URL hash for its
+ * own page routing (#/dashboard, #/settings, ...). Supabase ALSO uses the
+ * URL hash to deliver session info when someone lands here via an email
+ * link (#access_token=...&type=recovery, or &type=signup, etc). These two
+ * systems would collide if we relied on timing/events to sort it out — so
+ * instead we read the hash ourselves, synchronously, as the very first
+ * thing that runs, before the router (or anything async) ever touches it.
+ *
+ * Flow:
+ *   1. Verify local storage is available.
+ *   2. If the URL hash says we just arrived from an email link
+ *      (type=recovery / type=signup / ...error), handle that case
+ *      explicitly and stop — never fall through to the normal app.
+ *   3. Otherwise, check for an existing session and show either the app or
+ *      the sign-in screen.
+ *   4. Pull the signed-in user's cloud data down, seed a starter profile on
+ *      first run, then start the router.
  */
 
 (async function bootstrap() {
@@ -21,12 +32,15 @@
     return;
   }
 
+  let appHasStarted = false;
+
   async function startApp() {
-    await Seed.ensureCurrentUser();
+    await Seed.seedCreatorIfMissing();
     await Router.init();
   }
 
   async function afterAuthenticated(session) {
+    appHasStarted = true;
     if (session && session.user) {
       SyncService.setActiveUser(session.user.id);
       await SyncService.pullFromCloud(); // hydrate this device from the cloud, if there's anything there
@@ -41,44 +55,77 @@
     window.addEventListener('pagehide', () => SyncService.flush());
   }
 
-  if (AuthService.isConfigured()) {
-    let initialDecisionMade = false;
+  /** Reads Supabase's auth params straight off the URL hash — this is the
+   *  exact format its /auth/v1/verify redirect uses:
+   *  #access_token=...&refresh_token=...&type=recovery (or signup, etc)
+   *  A normal in-app route hash looks like "#/dashboard" and is left alone. */
+  function parseAuthHashParams() {
+    const hash = window.location.hash || '';
+    if (!hash || hash === '#' || hash.startsWith('#/')) return {};
+    return Object.fromEntries(new URLSearchParams(hash.replace(/^#/, '')));
+  }
 
-    AuthService.onAuthStateChange((event, session) => {
-      // A "reset your password" email link lands here and Supabase fires
-      // this event once it's finished logging the person into a temporary
-      // recovery session — regardless of which link format was used.
-      if (event === 'PASSWORD_RECOVERY') {
-        initialDecisionMade = true;
-        AuthUI.renderSetNewPassword({
-          onDone: async () => {
-            // Clean any recovery tokens/params out of the URL so refreshing
-            // afterwards doesn't try to replay this flow.
-            history.replaceState(null, '', window.location.pathname);
-            await afterAuthenticated(session);
-          },
-        });
-        return;
-      }
+  function clearAuthParamsFromUrl() {
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
 
-      if (event === 'SIGNED_OUT') {
-        if (initialDecisionMade) window.location.reload();
-        return;
-      }
-
-      // First "normal" event we see (typically INITIAL_SESSION) decides
-      // whether to open straight into the app or show the sign-in screen.
-      if (!initialDecisionMade) {
-        initialDecisionMade = true;
-        if (session) {
-          afterAuthenticated(session);
-        } else {
-          AuthUI.render({ onAuthenticated: afterAuthenticated });
-        }
-      }
-    });
-  } else {
+  if (!AuthService.isConfigured()) {
     // No Supabase config yet — behave like the original local-only prototype.
+    AuthUI.render({ onAuthenticated: afterAuthenticated });
+    return;
+  }
+
+  // Watch for sign-outs (including ones triggered from another tab) once the
+  // app has actually started, and drop back to a clean sign-in screen.
+  AuthService.onAuthStateChange((event) => {
+    if (event === 'SIGNED_OUT' && appHasStarted) {
+      window.location.reload();
+    }
+  });
+
+  const hashParams = parseAuthHashParams();
+  const authType = hashParams.type || null;
+  const authError = hashParams.error || hashParams.error_code || null;
+
+  if (authError) {
+    clearAuthParamsFromUrl();
+    const description = hashParams.error_description
+      ? decodeURIComponent(hashParams.error_description.replace(/\+/g, ' '))
+      : 'That link is invalid or has expired. Please try again.';
+    AuthUI.render({ onAuthenticated: afterAuthenticated, initialNotice: description });
+    return;
+  }
+
+  if (authType === 'recovery') {
+    // Supabase has already logged the person into a temporary recovery
+    // session by this point — read it, then force the "set a new password"
+    // screen before anything else can happen.
+    const recoverySession = await AuthService.getSession();
+    clearAuthParamsFromUrl();
+    AuthUI.renderSetNewPassword({
+      onDone: async () => { await afterAuthenticated(recoverySession); },
+    });
+    return;
+  }
+
+  if (authType === 'signup' || authType === 'email_change' || authType === 'invite' || authType === 'magiclink') {
+    // Supabase auto-logs the person in here too, but we deliberately sign
+    // them back out and ask them to log in explicitly, rather than silently
+    // dropping them into the app straight from an email link.
+    await AuthService.signOut();
+    clearAuthParamsFromUrl();
+    AuthUI.render({
+      onAuthenticated: afterAuthenticated,
+      initialNotice: 'Email confirmed! Please sign in to continue.',
+    });
+    return;
+  }
+
+  // Normal case: no special email-link params — just check for an existing session.
+  const existingSession = await AuthService.getSession();
+  if (existingSession) {
+    await afterAuthenticated(existingSession);
+  } else {
     AuthUI.render({ onAuthenticated: afterAuthenticated });
   }
 })();

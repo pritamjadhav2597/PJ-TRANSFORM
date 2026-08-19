@@ -9,12 +9,12 @@
 
 const AuthUI = (() => {
 
-  function render({ onAuthenticated }) {
+  function render({ onAuthenticated, initialNotice = null }) {
     const app = document.getElementById('app');
     app.innerHTML = '';
 
     let mode = 'signin'; // 'signin' | 'signup' | 'reset'
-    let pendingNotice = null; // text to show once, right after a redraw (e.g. "check your email")
+    let pendingNotice = initialNotice; // text to show once, right after a redraw (e.g. "check your email")
 
     const wrap = Utils.el('div', { class: 'auth-screen' });
     app.appendChild(wrap);
@@ -164,5 +164,75 @@ const AuthUI = (() => {
     draw();
   }
 
-  return { render };
+  /**
+   * Shown when someone arrives via a "reset your password" email link.
+   * Supabase has already logged them into a temporary recovery session at
+   * this point — this screen just collects a new password and applies it.
+   */
+  function renderSetNewPassword({ onDone }) {
+    const app = document.getElementById('app');
+    app.innerHTML = '';
+
+    const wrap = Utils.el('div', { class: 'auth-screen' });
+    app.appendChild(wrap);
+
+    const card = Utils.el('div', { class: 'card auth-card' });
+
+    const brand = Utils.el('div', { class: 'auth-brand' }, [
+      Utils.el('span', { class: 'auth-brand__mark' }, '◐'),
+      Utils.el('span', { class: 'auth-brand__text' }, 'Transform'),
+    ]);
+    const title = Utils.el('h1', { class: 'auth-title' }, 'Set a new password');
+    const subtitle = Utils.el('p', { class: 'auth-subtitle' }, 'Choose a new password for your account.');
+    const errorBox = Utils.el('div', { class: 'error-list', style: 'display:none;' });
+
+    const passwordField = Utils.el('div', { class: 'form__field' }, [
+      Utils.el('label', { class: 'form__label' }, 'New password'),
+      Utils.el('input', { class: 'form__input', type: 'password', id: 'new-password', autocomplete: 'new-password', placeholder: 'At least 6 characters' }),
+    ]);
+    const confirmField = Utils.el('div', { class: 'form__field' }, [
+      Utils.el('label', { class: 'form__label' }, 'Confirm password'),
+      Utils.el('input', { class: 'form__input', type: 'password', id: 'confirm-password', autocomplete: 'new-password', placeholder: 'Type it again' }),
+    ]);
+
+    const submitBtn = Utils.el('button', { class: 'btn btn--primary auth-submit', type: 'submit' }, 'Update password');
+
+    const form = Utils.el('form', {
+      class: 'form auth-form',
+      onSubmit: async (e) => {
+        e.preventDefault();
+        errorBox.style.display = 'none';
+        const pw = document.getElementById('new-password').value;
+        const confirmPw = document.getElementById('confirm-password').value;
+
+        if (!pw || pw.length < 6) return showError('Password must be at least 6 characters.');
+        if (pw !== confirmPw) return showError('Passwords don\u2019t match.');
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Updating…';
+        const { error } = await AuthService.updateUserPassword(pw);
+        if (error) {
+          showError(error.message);
+          return;
+        }
+        Utils.toast && Utils.toast('Password updated.', 'success');
+        onDone();
+      },
+    }, [passwordField, confirmField, errorBox, Utils.el('div', { class: 'form__actions' }, [submitBtn])]);
+
+    function showError(msg) {
+      errorBox.textContent = msg;
+      errorBox.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Update password';
+    }
+
+    card.appendChild(brand);
+    card.appendChild(title);
+    card.appendChild(subtitle);
+    card.appendChild(form);
+    wrap.appendChild(card);
+  }
+
+  return { render, renderSetNewPassword };
 })();
