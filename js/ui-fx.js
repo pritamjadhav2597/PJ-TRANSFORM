@@ -121,8 +121,10 @@ const UIFx = (() => {
           <clipPath id="liquidClip"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 4}"></circle></clipPath>
         </defs>
         <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 4}" class="liquid-gauge__track"></circle>
-        <g clip-path="url(#liquidClip)" class="liquid-gauge__fill-group" data-target-y="${level}" style="transform:translateY(${size}px)">
-          <path class="liquid-gauge__wave" d="M0 20 Q 18.75 10 37.5 20 T 75 20 T 112.5 20 T 150 20 V 160 H 0 Z" style="fill:${colorVar}"></path>
+        <g clip-path="url(#liquidClip)">
+          <g class="liquid-gauge__fill-group" data-target-y="${level}" style="transform:translateY(${size}px)">
+            <path class="liquid-gauge__wave" d="M0 20 Q 18.75 10 37.5 20 T 75 20 T 112.5 20 T 150 20 V 160 H 0 Z" style="fill:${colorVar}"></path>
+          </g>
         </g>
         <circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 4}" class="liquid-gauge__ring"></circle>
       </svg>

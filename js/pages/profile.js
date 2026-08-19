@@ -450,15 +450,19 @@ const PageProfile = (() => {
     const updatedProfile = await DataService.profiles.update(profile.profileId, patch);
 
     // Keep the mobile-number-to-email sign-in lookup in sync with whatever
-    // was just saved — link a new/changed number, unlink a cleared one.
-    // Best-effort: doesn't block the save or show its own errors, since
-    // manual email+password sign-in still works either way.
+    // was just saved. Deliberately re-attempts the link on every save, even
+    // if the number itself didn't change — this makes it self-healing: if
+    // the one-time Supabase SQL setup (supabase-setup-phone-lookup.sql)
+    // hadn't been run yet the first time someone saved their number, that
+    // link silently failed, and without this it would stay silently
+    // missing forever. Best-effort either way: doesn't block the save or
+    // show its own errors, since email+password sign-in works regardless.
     const newMobile = Utils.normalizeMobile(patch.mobileNumber);
     const oldMobile = Utils.normalizeMobile(profile.mobileNumber);
-    if (newMobile && newMobile !== oldMobile) {
+    if (newMobile) {
       AuthService.linkMobileNumber(newMobile);
-      if (oldMobile) AuthService.unlinkMobileNumber(oldMobile);
-    } else if (!newMobile && oldMobile) {
+      if (oldMobile && oldMobile !== newMobile) AuthService.unlinkMobileNumber(oldMobile);
+    } else if (oldMobile) {
       AuthService.unlinkMobileNumber(oldMobile);
     }
 
