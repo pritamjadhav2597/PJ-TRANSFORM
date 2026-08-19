@@ -1,6 +1,6 @@
 // Service worker for Personal Transformation PWA
 // Bump this version any time app files change, to force cache refresh.
-const CACHE_VERSION = 'v5';
+const CACHE_VERSION = 'v7';
 const CACHE_NAME = `transform-app-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
@@ -127,7 +127,13 @@ self.addEventListener('fetch', (event) => {
       })
     );
   } else {
-    // Cross-origin (e.g. Google Fonts): stale-while-revalidate
+    // Cross-origin (e.g. Google Fonts): stale-while-revalidate.
+    // Skip anything that isn't a normal http(s) request — browser extensions
+    // sometimes trigger fetches with schemes like chrome-extension://, which
+    // the Cache API can't store and would otherwise throw on.
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return;
+    }
     event.respondWith(
       caches.match(req).then((cached) => {
         const fetchPromise = fetch(req)
