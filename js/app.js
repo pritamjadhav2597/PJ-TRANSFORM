@@ -43,6 +43,18 @@
   async function afterAuthenticated(session) {
     appHasStarted = true;
     if (session && session.user) {
+      // If local storage already belongs to a *different* auth account than
+      // the one that just signed in — a different account on a shared
+      // device, or this same email re-signed-up after the old account was
+      // deleted (Supabase always issues a fresh id in that case, it never
+      // reuses the old one) — start this identity from zero instead of
+      // silently inheriting the previous account's leftover local data.
+      const previousAuthUserId = DataService.getLinkedAuthUserId();
+      if (previousAuthUserId && previousAuthUserId !== session.user.id) {
+        DataService.clearAll();
+      }
+      DataService.setLinkedAuthUserId(session.user.id);
+
       SyncService.setActiveUser(session.user.id);
       await SyncService.pullFromCloud(); // hydrate this device from the cloud, if there's anything there
     }

@@ -132,7 +132,26 @@ const DataService = (() => {
   }
 
   function setCurrentUserId(userId) {
-    engine.write(SESSION_KEY, { currentUserId: userId });
+    const existing = engine.read(SESSION_KEY) || {};
+    engine.write(SESSION_KEY, { ...existing, currentUserId: userId });
+  }
+
+  /** Which Supabase auth account (session.user.id) the data currently
+   *  sitting in local storage belongs to — null if this device has never
+   *  signed in to a cloud account (local-only mode, or fresh install).
+   *  Used on sign-in to detect "this is a different identity than what's
+   *  stored locally" (a different account, or the same email re-signed-up
+   *  after the old account was deleted — Supabase gives that a brand new
+   *  id) so stale data doesn't leak across accounts on the same device.
+   *  See js/app.js afterAuthenticated(). */
+  function getLinkedAuthUserId() {
+    const session = engine.read(SESSION_KEY);
+    return session ? (session.authUserId || null) : null;
+  }
+
+  function setLinkedAuthUserId(authUserId) {
+    const existing = engine.read(SESSION_KEY) || {};
+    engine.write(SESSION_KEY, { ...existing, authUserId });
   }
 
   // -------------------------------------------------------------------
@@ -260,6 +279,8 @@ const DataService = (() => {
     ...api,
     getCurrentUserId,
     setCurrentUserId,
+    getLinkedAuthUserId,
+    setLinkedAuthUserId,
     exportData,
     importData,
     clearAll,
