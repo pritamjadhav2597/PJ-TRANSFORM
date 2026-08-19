@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Personal Transformation</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#294F3A" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Transform" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+<link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/styles.css" />
+
+<!-- Supabase client (auth + database) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+</head>
+<body>
+
+<div id="app">
+  <!-- Router builds the shell (sidebar + topbar + page outlet) here -->
+</div>
+
+<!-- Auth + sync (must load before storage-service, which calls into SyncService) -->
+<script src="js/supabase-config.js"></script>
+<script src="js/auth-service.js"></script>
+<script src="js/sync-service.js"></script>
+
+<!-- Foundation layer: models -> storage -> business logic -> utils -> seed -->
+<script src="js/models.js"></script>
+<script src="js/storage-service.js"></script>
+<script src="js/calculations.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/auth-ui.js"></script>
+<script src="js/program-templates.js"></script>
+<script src="js/food-database.js"></script>
+<script src="js/food-calculations.js"></script>
+<script src="js/meal-calendar-data.js"></script>
+<script src="js/diet-engine.js"></script>
+<script src="js/daily-tracking-engine.js"></script>
+<script src="js/exercise-library.js"></script>
+<script src="js/exercise-video.js"></script>
+<script src="js/video-modal.js"></script>
+<script src="js/workout-engine.js"></script>
+<script src="js/workout-actions.js"></script>
+<script src="js/workout-session.js"></script>
+<script src="js/progress-engine.js"></script>
+<script src="js/chart-utils.js"></script>
+<script src="js/ui-fx.js"></script>
+<script src="js/device-integration.js"></script>
+<script src="js/recovery-engine.js"></script>
+<script src="js/craving-engine.js"></script>
+<script src="js/shopping-engine.js"></script>
+<script src="js/reports-engine.js"></script>
+<script src="js/bollywood-program-data.js"></script>
+<script src="js/bollywood-setup.js"></script>
+<script src="js/seed.js"></script>
+
+<!-- Page modules (each exposes render(container, route)) -->
+<script src="js/pages/dashboard.js"></script>
+<script src="js/pages/profile.js"></script>
+<script src="js/pages/programs.js"></script>
+<script src="js/pages/products.js"></script>
+<script src="js/pages/nutrition.js"></script>
+<script src="js/pages/diet.js"></script>
+<script src="js/pages/calendar.js"></script>
+<script src="js/pages/meal-calendar.js"></script>
+<script src="js/pages/workout.js"></script>
+<script src="js/pages/progress.js"></script>
+<script src="js/pages/water.js"></script>
+<script src="js/pages/steps.js"></script>
+<script src="js/pages/sleep.js"></script>
+<script src="js/pages/recovery.js"></script>
+<script src="js/pages/wellbeing.js"></script>
+<script src="js/pages/craving.js"></script>
+<script src="js/pages/shopping.js"></script>
+<script src="js/pages/reports.js"></script>
+<script src="js/pages/program-bollywood.js"></script>
+<script src="js/pages/settings.js"></script>
+<script src="js/pages/placeholder.js"></script>
+
+<!-- Router + bootstrap -->
+<script src="js/router.js"></script>
+<script src="js/app.js"></script>
+
+<!-- PWA: register service worker for offline support -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch((err) => {
+        console.warn('Service worker registration failed:', err);
+      });
+    });
+  }
+</script>
+
+</body>
+</html>
