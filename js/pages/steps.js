@@ -12,6 +12,18 @@ const PageSteps = (() => {
   let selectedProvider = 'manual';
   let historyView = 'daily'; // 'daily' | 'weekly'
 
+  // --- Live (in-app, foreground) step tracking session state ---------
+  // Deliberately module-level, not per-render: a re-render (e.g. after
+  // saving a manual entry) must not interrupt an active tracking session.
+  let liveActive = false;
+  let liveBaselineSteps = 0;   // steps already saved for today before this session started
+  let liveSessionSteps = 0;    // steps counted during this session only
+  let liveFlushTimer = null;
+  let liveHashListener = null;
+  let liveVisibilityListener = null;
+  let liveCounterEl = null;    // direct DOM ref so ticks don't need a full re-render
+  let liveUserId = null;
+
   async function render(container) {
     await renderInner(container);
   }
@@ -37,11 +49,141 @@ const PageSteps = (() => {
     const dailyChecklist = (await DataService.dailyChecklists.list(c => c.userId === userId && c.date === selectedDate))[0] || null;
 
     container.appendChild(renderStepsHero(targets, stepEntries));
+    container.appendChild(renderLiveTrackingCard(userId, stepEntries, container));
     container.appendChild(renderStatsCard(userId, targets, stepEntries, dailyChecklist, container));
     container.appendChild(renderDeviceCard(userId, stepEntries, container));
     container.appendChild(renderHistoryCard(stepEntries, container));
 
     UIFx.animateIn(container);
+  }
+
+  function renderLiveTrackingCard(userId, stepEntries, container) {
+    const today = Models.todayIso();
+    const isToday = selectedDate === today;
+
+    if (!isToday) {
+      return Utils.el('section', { class: 'card' }, [
+        Utils.el('div', { class: 'card__header' }, [
+          Utils.el('h2', { class: 'card__title' }, 'Live Tracking'),
+        ]),
+        Utils.el('p', { class: 'card__footnote' }, 'Live tracking only works for today \u2014 switch to today\u2019s date to start it.'),
+      ]);
+    }
+
+    if (!StepCounter.isSupported()) {
+      return Utils.el('section', { class: 'card' }, [
+        Utils.el('div', { class: 'card__header' }, [
+          Utils.el('h2', { class: 'card__title' }, 'Live Tracking'),
+        ]),
+        Utils.el('p', { class: 'card__footnote' }, 'This device/browser doesn\u2019t support motion sensing, so live step tracking isn\u2019t available here \u2014 use manual entry below instead.'),
+      ]);
+    }
+
+    const todayEntry = stepEntries.find(s => s.date === today);
+    const savedToday = todayEntry?.steps ?? 0;
+
+    const countDisplay = Utils.el('div', { class: 'live-steps__count' }, `${liveActive ? liveBaselineSteps + liveSessionSteps : savedToday}`);
+    liveCounterEl = liveActive ? countDisplay : null;
+
+    const statusRow = liveActive
+      ? Utils.el('div', { class: 'live-steps__status' }, [
+          Utils.el('span', { class: 'live-dot' }),
+          Utils.el('span', {}, `Live \u2014 +${liveSessionSteps} this session`),
+        ])
+      : Utils.el('p', { class: 'card__footnote' }, 'Counts steps from your phone\u2019s motion sensor while this page is open on screen. It stops if you switch apps or lock the screen \u2014 that\u2019s a browser limitation, not a bug. Estimated, not lab-precise.');
+
+    const toggleBtn = Utils.el('button', {
+      class: `btn ${liveActive ? 'btn--danger' : 'btn--primary'} btn--row`, type: 'button',
+      onClick: async () => {
+        if (liveActive) {
+          await stopLiveTracking(container);
+        } else {
+          await startLiveTracking(userId, container);
+        }
+      },
+    }, liveActive ? 'Stop Live Tracking' : 'Start Live Tracking');
+
+    return Utils.el('section', { class: `card${liveActive ? ' card--live' : ''}` }, [
+      Utils.el('div', { class: 'card__header' }, [
+        Utils.el('div', {}, [
+          Utils.el('h2', { class: 'card__title' }, 'Live Tracking'),
+          Utils.el('p', { class: 'card__subtitle' }, 'Steps counted automatically from your phone, right in the app.'),
+        ]),
+      ]),
+      countDisplay,
+      statusRow,
+      Utils.el('div', { class: 'row-actions', style: 'margin-top:10px;' }, [toggleBtn]),
+    ]);
+  }
+
+  async function startLiveTracking(userId, container) {
+    if (StepCounter.needsPermission()) {
+      const granted = await StepCounter.requestPermission();
+      if (!granted) {
+        Utils.toast('Motion access was denied \u2014 enable it in your browser/phone settings to use live tracking.', 'error');
+        return;
+      }
+    }
+
+    const today = Models.todayIso();
+    const existing = (await DataService.stepEntries.list(s => s.userId === userId && s.date === today))[0] || null;
+    liveBaselineSteps = existing?.steps ?? 0;
+    liveSessionSteps = 0;
+    liveUserId = userId;
+
+    const started = StepCounter.start(() => {
+      liveSessionSteps += 1;
+      if (liveCounterEl) liveCounterEl.textContent = `${liveBaselineSteps + liveSessionSteps}`;
+      if (liveSessionSteps % 5 === 0) flushLiveSteps();
+    });
+
+    if (!started) {
+      Utils.toast('Live tracking isn\u2019t available on this device.', 'error');
+      return;
+    }
+
+    liveActive = true;
+    liveFlushTimer = setInterval(flushLiveSteps, 8000);
+
+    // Auto-stop (with a final flush) if the person navigates away from this
+    // page entirely, so a session never keeps "running" invisibly forever.
+    liveHashListener = () => { stopLiveTracking(null); };
+    window.addEventListener('hashchange', liveHashListener, { once: true });
+
+    // Flush promptly (but don't auto-stop) if the tab is backgrounded —
+    // devicemotion pauses on its own there, this just avoids losing the
+    // last few unsynced steps if the person doesn't come straight back.
+    liveVisibilityListener = () => { if (document.hidden) flushLiveSteps(); };
+    document.addEventListener('visibilitychange', liveVisibilityListener);
+
+    await renderInner(container);
+  }
+
+  async function stopLiveTracking(container) {
+    StepCounter.stop();
+    await flushLiveSteps();
+
+    if (liveFlushTimer) clearInterval(liveFlushTimer);
+    liveFlushTimer = null;
+    if (liveHashListener) window.removeEventListener('hashchange', liveHashListener);
+    liveHashListener = null;
+    if (liveVisibilityListener) document.removeEventListener('visibilitychange', liveVisibilityListener);
+    liveVisibilityListener = null;
+
+    liveActive = false;
+    liveCounterEl = null;
+    liveSessionSteps = 0;
+
+    if (container) await renderInner(container);
+  }
+
+  async function flushLiveSteps() {
+    if (!liveUserId) return;
+    const today = Models.todayIso();
+    const total = liveBaselineSteps + liveSessionSteps;
+    const existing = (await DataService.stepEntries.list(s => s.userId === liveUserId && s.date === today))[0] || null;
+    if (existing) await DataService.stepEntries.update(existing.stepEntryId, { steps: total, source: 'live_device' });
+    else await DataService.stepEntries.create(Models.createStepEntry(liveUserId, today, { steps: total, source: 'live_device' }));
   }
 
   function renderStepsHero(targets, stepEntries) {
@@ -101,11 +243,12 @@ const PageSteps = (() => {
       },
     }, eveningWalkDone ? '✓ Evening walk done' : 'Mark evening walk done');
 
-    const entryInput = Utils.el('input', { class: 'form__input', type: 'number', min: 0, placeholder: 'Total steps', style: 'width:130px;' });
+    const entryInput = Utils.el('input', { class: 'form__input', type: 'number', min: 0, placeholder: 'Total steps', style: 'width:130px;', disabled: liveActive || undefined });
     const existing = stepEntries.find(s => s.date === selectedDate);
     if (existing?.steps != null) entryInput.value = existing.steps;
-    const saveBtn = Utils.el('button', { class: 'btn btn--primary btn--row', type: 'button' }, 'Save Steps');
+    const saveBtn = Utils.el('button', { class: 'btn btn--primary btn--row', type: 'button', disabled: liveActive || undefined }, 'Save Steps');
     saveBtn.addEventListener('click', async () => {
+      if (liveActive) { Utils.toast('Stop live tracking to enter steps manually.', 'info'); return; }
       const steps = Number(entryInput.value);
       if (entryInput.value === '' || steps < 0) { Utils.toast('Enter a step count.', 'error'); return; }
       if (existing) await DataService.stepEntries.update(existing.stepEntryId, { steps, source: 'manual' });

@@ -9,19 +9,20 @@ const PageProfile = (() => {
     {
       title: 'Basics',
       fields: [
-        { key: 'name', label: 'Name', type: 'text' },
-        { key: 'age', label: 'Age', type: 'number', min: 10, max: 100 },
-        { key: 'sex', label: 'Sex', type: 'select', options: ['male', 'female', 'other'] },
-        { key: 'heightCm', label: 'Height (cm)', type: 'number', min: 100, max: 250 },
+        { key: 'name', label: 'Name', type: 'text', required: true },
+        { key: 'mobileNumber', label: 'Mobile Number', type: 'tel', placeholder: 'e.g. +91 98765 43210' },
+        { key: 'age', label: 'Age', type: 'number', min: 10, max: 100, required: true },
+        { key: 'sex', label: 'Sex', type: 'select', options: ['male', 'female', 'other'], required: true },
+        { key: 'heightCm', label: 'Height (cm)', type: 'number', min: 100, max: 250, required: true },
       ],
     },
     {
       title: 'Weight & Goal',
       fields: [
-        { key: 'currentWeightKg', label: 'Current weight (kg)', type: 'number', min: 30, max: 300, step: '0.01' },
+        { key: 'currentWeightKg', label: 'Current weight (kg)', type: 'number', min: 30, max: 300, step: '0.01', required: true },
         { key: 'targetWeightKg', label: 'Target weight (kg)', type: 'number', min: 30, max: 300, step: '0.01' },
         { key: 'primaryGoal', label: 'Primary goal (description)', type: 'text' },
-        { key: 'goalType', label: 'Goal type', type: 'select', options: ['fat_loss', 'maintenance', 'muscle_gain', 'body_recomposition', 'general_fitness'] },
+        { key: 'goalType', label: 'Goal type', type: 'select', options: ['fat_loss', 'maintenance', 'muscle_gain', 'body_recomposition', 'general_fitness'], required: true },
         { key: 'desiredWeeklyChangePercent', label: 'Desired weekly rate (% bodyweight, optional)', type: 'number', min: 0, max: 1.5, step: '0.05' },
         { key: 'programPreference', label: 'Program preference (default: 60-Day Transformation)', type: 'select', options: ['60_day', '100_day_bollywood', '1_year', 'custom'], defaultValue: '60_day' },
         { key: 'programStartDate', label: 'Program start date', type: 'date' },
@@ -32,7 +33,7 @@ const PageProfile = (() => {
       fields: [
         { key: 'activityLevelSource', label: 'Activity level calculation', type: 'select', options: ['auto', 'manual'] },
         { key: 'activityLevel', label: 'Activity level (used only when calculation is "manual")', type: 'select', options: ['sedentary', 'light', 'moderate', 'active', 'very_active'] },
-        { key: 'occupationType', label: 'Occupation / activity type', type: 'select', options: ['mostly_sitting', 'mostly_standing', 'physical'] },
+        { key: 'occupationType', label: 'Occupation / activity type', type: 'select', options: ['mostly_sitting', 'mostly_standing', 'physical'], required: true },
         { key: 'averageDailySteps', label: 'Average daily steps', type: 'number', min: 0, max: 60000 },
         { key: 'trainingFrequencyPerWeek', label: 'Training frequency (days/week)', type: 'number', min: 0, max: 14 },
         { key: 'dietaryPreference', label: 'Dietary preference', type: 'select', options: ['vegetarian', 'vegan', 'pescatarian', 'omnivore', 'other'] },
@@ -55,6 +56,22 @@ const PageProfile = (() => {
       ],
     },
   ];
+
+  // Keys of every field marked required: true above — the fields the rest
+  // of the app (BMR/TDEE, step target, workout & diet recommendations)
+  // actually needs to produce real numbers instead of blanks/zeros.
+  const MANDATORY_KEYS = FIELD_GROUPS.flatMap(g => g.fields).filter(f => f.required).map(f => f.key);
+
+  /** Whether a profile has every mandatory field filled in. Used by the
+   *  router to gate the rest of the app behind onboarding for a brand-new
+   *  or still-incomplete profile. */
+  function isComplete(profile) {
+    if (!profile) return false;
+    return MANDATORY_KEYS.every(key => {
+      const v = profile[key];
+      return v !== null && v !== undefined && String(v).trim() !== '';
+    });
+  }
 
   async function render(container) {
     let userId = DataService.getCurrentUserId();
@@ -96,6 +113,13 @@ const PageProfile = (() => {
       e.preventDefault();
       await handleSave(form, profile, errorsHost, container);
     });
+
+    if (!isComplete(profile)) {
+      container.appendChild(Utils.el('div', { class: 'card card--onboarding' }, [
+        Utils.el('h3', { class: 'card__title' }, '\u{1F44B} Welcome — let\u2019s set up your profile'),
+        Utils.el('p', {}, 'Fill in the fields marked with * below. They drive every calculated target in the app — calories, macros, water, and step goals — so nothing else can be personalized until they\u2019re filled in.'),
+      ]));
+    }
 
     container.appendChild(renderProfileHero(profile, activeProgram, activeCurrentPhase));
     container.appendChild(Utils.el('div', { class: 'card card--form', id: 'profile-form-card' }, [
@@ -357,7 +381,8 @@ const PageProfile = (() => {
 
   function renderField(field, value) {
     const id = `field-${field.key}`;
-    const label = Utils.el('label', { class: 'form__label', for: id }, field.label);
+    const label = Utils.el('label', { class: 'form__label', for: id },
+      field.required ? [field.label, Utils.el('span', { class: 'form__required', 'aria-hidden': 'true', title: 'Required' }, ' *')] : field.label);
     // For a brand-new profile with nothing chosen yet, pre-select a sane
     // default in the UI only — nothing is written to storage until the
     // person actually saves the form (see IMPORTANT: default program is
@@ -365,7 +390,7 @@ const PageProfile = (() => {
     const effectiveValue = (value === null || value === undefined || value === '') && field.defaultValue ? field.defaultValue : value;
     let input;
     if (field.type === 'select') {
-      input = Utils.el('select', { class: 'form__input', id, name: field.key }, [
+      input = Utils.el('select', { class: 'form__input', id, name: field.key, required: field.required || undefined }, [
         Utils.el('option', { value: '' }, '— Select —'),
         ...field.options.map(opt => {
           const o = Utils.el('option', { value: opt }, opt.replace(/_/g, ' '));
@@ -378,9 +403,11 @@ const PageProfile = (() => {
         class: 'form__input', id, name: field.key, type: field.type,
         min: field.min, max: field.max, step: field.step,
         value: effectiveValue ?? '',
+        required: field.required || undefined,
+        placeholder: field.placeholder || undefined,
       });
     }
-    return Utils.el('div', { class: 'form__field' }, [label, input]);
+    return Utils.el('div', { class: `form__field${field.required ? ' form__field--required' : ''}` }, [label, input]);
   }
 
   async function handleSave(form, profile, errorsHost, container) {
@@ -390,6 +417,10 @@ const PageProfile = (() => {
 
     FIELD_GROUPS.flatMap(g => g.fields).forEach(field => {
       let raw = formData.get(field.key);
+      if (field.required) {
+        const reqErr = Utils.Validate.required(raw, field.label);
+        if (reqErr) errors.push(reqErr);
+      }
       if (field.type === 'number') {
         const err = Utils.Validate.range(raw, field.min, field.max, field.label);
         if (err) errors.push(err);
@@ -417,6 +448,20 @@ const PageProfile = (() => {
     }
 
     const updatedProfile = await DataService.profiles.update(profile.profileId, patch);
+
+    // Keep the mobile-number-to-email sign-in lookup in sync with whatever
+    // was just saved — link a new/changed number, unlink a cleared one.
+    // Best-effort: doesn't block the save or show its own errors, since
+    // manual email+password sign-in still works either way.
+    const newMobile = Utils.normalizeMobile(patch.mobileNumber);
+    const oldMobile = Utils.normalizeMobile(profile.mobileNumber);
+    if (newMobile && newMobile !== oldMobile) {
+      AuthService.linkMobileNumber(newMobile);
+      if (oldMobile) AuthService.unlinkMobileNumber(oldMobile);
+    } else if (!newMobile && oldMobile) {
+      AuthService.unlinkMobileNumber(oldMobile);
+    }
+
     const indicator = document.getElementById('saved-indicator');
     if (indicator) {
       indicator.textContent = 'Saved just now';
@@ -431,6 +476,16 @@ const PageProfile = (() => {
     const targets = Calculations.calculateAllTargets(updatedProfile, { weightEntries, program, phase });
     await Calculations.recordTargetChangesIfNeeded(profile.userId, targets, 'profile_update');
 
+    // If this save just finished onboarding (profile went from incomplete
+    // to complete), move straight into the app instead of leaving the
+    // person parked on the profile form.
+    const justCompletedOnboarding = !isComplete(profile) && isComplete(updatedProfile);
+    if (justCompletedOnboarding) {
+      Utils.toast('Profile complete — welcome aboard!', 'success');
+      Router.navigate('dashboard');
+      return;
+    }
+
     Utils.toast('Profile saved.', 'success');
 
     // Saving must update every connected calculation/display immediately —
@@ -438,5 +493,5 @@ const PageProfile = (() => {
     if (container) { container.innerHTML = ''; await render(container); }
   }
 
-  return { render };
+  return { render, isComplete };
 })();
