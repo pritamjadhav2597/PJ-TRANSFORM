@@ -74,6 +74,7 @@ const Models = (() => {
       email,               // reserved for future authentication
       name,
       authProvider,        // 'local' | 'email' | 'google' | ... (future)
+      welcomeIntroSeen: false, // flips true once the person dismisses the first-run welcome slideshow (see js/welcome-intro.js) — never shown again on this account, any device
       createdAt: nowIso(),
       updatedAt: nowIso(),
     };
@@ -84,6 +85,7 @@ const Models = (() => {
       profileId: generateId('profile'),
       userId,
       name: '',
+      mobileNumber: '',           // contact info only — not used for sign-in/auth
       age: null,
       sex: '',                    // 'male' | 'female' | 'other'
       heightCm: null,

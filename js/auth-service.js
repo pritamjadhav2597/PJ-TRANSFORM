@@ -70,6 +70,59 @@ const AuthService = (() => {
     return supabaseClient.auth.updateUser({ password: newPassword });
   }
 
+  /** Links a mobile number to the currently signed-in account's email, so
+   *  a future sign-in can use the mobile number instead of typing the email
+   *  (see resolveEmailByMobile below). Called from the Profile page
+   *  whenever the mobile number field is saved. Silently no-ops if
+   *  Supabase isn't configured or nobody is signed in — this is a
+   *  convenience layer, not something the rest of the app depends on. */
+  async function linkMobileNumber(mobileNumber) {
+    if (!isConfigured()) return;
+    const session = await getSession();
+    if (!session?.user?.id || !session?.user?.email) return;
+    try {
+      await supabaseClient.from('phone_lookup').upsert({
+        mobile_number: mobileNumber,
+        user_id: session.user.id,
+        email: session.user.email,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'mobile_number' });
+    } catch (err) {
+      console.error('linkMobileNumber failed', err);
+    }
+  }
+
+  /** Removes a previously-linked mobile number (e.g. the person cleared the
+   *  field on their profile). Best-effort — a failure here just means an
+   *  old number keeps resolving to this account, which isn't dangerous
+   *  since sign-in still requires the correct password either way. */
+  async function unlinkMobileNumber(mobileNumber) {
+    if (!isConfigured() || !mobileNumber) return;
+    const session = await getSession();
+    if (!session?.user?.id) return;
+    try {
+      await supabaseClient.from('phone_lookup').delete().eq('mobile_number', mobileNumber).eq('user_id', session.user.id);
+    } catch (err) {
+      console.error('unlinkMobileNumber failed', err);
+    }
+  }
+
+  /** Resolves a mobile number to its linked email via the get_email_by_mobile
+   *  Postgres function (see supabase-setup-phone-lookup.sql) — returns null
+   *  if there's no match. Used by the sign-in screen so someone can type
+   *  their mobile number instead of their email. */
+  async function resolveEmailByMobile(mobileNumber) {
+    if (!isConfigured()) return null;
+    try {
+      const { data, error } = await supabaseClient.rpc('get_email_by_mobile', { p_mobile: mobileNumber });
+      if (error) { console.error('resolveEmailByMobile failed', error); return null; }
+      return data || null;
+    } catch (err) {
+      console.error('resolveEmailByMobile failed', err);
+      return null;
+    }
+  }
+
   /** Register the app's single auth-event handler. If Supabase already fired
    *  an event before this was called (see module-load subscription above),
    *  replay it immediately so nothing gets missed. */
@@ -81,5 +134,8 @@ const AuthService = (() => {
     }
   }
 
-  return { isConfigured, getSession, signUp, signIn, signOut, resetPasswordForEmail, updateUserPassword, onAuthStateChange };
+  return {
+    isConfigured, getSession, signUp, signIn, signOut, resetPasswordForEmail, updateUserPassword,
+    linkMobileNumber, unlinkMobileNumber, resolveEmailByMobile, onAuthStateChange,
+  };
 })();

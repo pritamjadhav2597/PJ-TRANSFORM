@@ -35,6 +35,16 @@ const DeviceIntegration = (() => {
       available: false,
       // fetchStepsForDate: async (date) => null,
     },
+    // Real, active today — see js/step-counter.js. Push-based (the Steps
+    // page writes to it live while tracking), not pull-based like
+    // fetchStepsForDate providers above, so it's registered here only for
+    // its label/lookup, not as a selectable "data source".
+    live_device: {
+      key: 'live_device',
+      label: 'Live tracking (in-app)',
+      isDevice: true,
+      available: true,
+    },
   };
 
   function listProviders() {

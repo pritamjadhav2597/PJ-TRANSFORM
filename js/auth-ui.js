@@ -49,8 +49,12 @@ const AuthUI = (() => {
       }
 
       const emailField = Utils.el('div', { class: 'form__field' }, [
-        Utils.el('label', { class: 'form__label' }, 'Email'),
-        Utils.el('input', { class: 'form__input', type: 'email', id: 'auth-email', autocomplete: 'email', placeholder: 'you@example.com' }),
+        Utils.el('label', { class: 'form__label' }, mode === 'signin' ? 'Email or Mobile Number' : 'Email'),
+        Utils.el('input', {
+          class: 'form__input', type: mode === 'signin' ? 'text' : 'email', id: 'auth-email',
+          autocomplete: mode === 'signin' ? 'username' : 'email',
+          placeholder: mode === 'signin' ? 'you@example.com or +91 98765 43210' : 'you@example.com',
+        }),
       ]);
 
       const passwordField = Utils.el('div', { class: 'form__field' }, [
@@ -74,10 +78,10 @@ const AuthUI = (() => {
         onSubmit: async (e) => {
           e.preventDefault();
           errorBox.style.display = 'none';
-          const email = document.getElementById('auth-email').value.trim();
+          const identifier = document.getElementById('auth-email').value.trim();
           const password = mode === 'reset' ? null : document.getElementById('auth-password').value;
 
-          if (!email) return showError('Enter your email address.');
+          if (!identifier) return showError(mode === 'signin' ? 'Enter your email or mobile number.' : 'Enter your email address.');
           if (mode !== 'reset' && (!password || password.length < 6)) {
             return showError('Password must be at least 6 characters.');
           }
@@ -87,7 +91,8 @@ const AuthUI = (() => {
 
           try {
             if (mode === 'signup') {
-              const { data, error } = await AuthService.signUp(email, password);
+              if (!identifier.includes('@')) return showError('Sign up with your email address — you can add a mobile number afterward, on your profile.');
+              const { data, error } = await AuthService.signUp(identifier, password);
               if (error) return showError(error.message);
               if (data.session) {
                 onAuthenticated(data.session);
@@ -97,18 +102,27 @@ const AuthUI = (() => {
                 draw();
               }
             } else if (mode === 'reset') {
-              const { error } = await AuthService.resetPasswordForEmail(email);
+              if (!identifier.includes('@')) return showError('Enter your email address to reset your password.');
+              const { error } = await AuthService.resetPasswordForEmail(identifier);
               if (error) return showError(error.message);
               pendingNotice = 'Reset link sent — check your email.';
               mode = 'signin';
               draw();
             } else {
+              let email = identifier;
+              if (!identifier.includes('@')) {
+                // Looks like a mobile number, not an email — resolve it to
+                // the linked account email first (see auth-service.js).
+                const resolved = await AuthService.resolveEmailByMobile(Utils.normalizeMobile(identifier));
+                if (!resolved) return showError('Invalid email/mobile number or password.');
+                email = resolved;
+              }
               const { data, error } = await AuthService.signIn(email, password);
               if (error) {
                 if (/email not confirmed/i.test(error.message)) {
                   return showError('Please confirm your email first — check your inbox for the link we sent when you signed up.');
                 }
-                return showError(error.message);
+                return showError('Invalid email/mobile number or password.');
               }
               onAuthenticated(data.session);
             }

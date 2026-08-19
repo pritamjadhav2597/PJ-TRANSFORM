@@ -98,5 +98,14 @@ const Utils = (() => {
     }, 3200);
   }
 
-  return { formatDate, formatDateTime, fmt, el, qs, qsa, debounce, Validate, toast };
+  /** Strips spaces, dashes, and parens so the same number always matches
+   *  regardless of formatting (e.g. "+91 98765 43210" and "+919876543210"
+   *  normalize the same way). Keeps a leading "+" if present. Used both
+   *  when saving a profile's mobile number and when resolving it at
+   *  sign-in — see js/auth-service.js. */
+  function normalizeMobile(value) {
+    return (value || '').replace(/[\s\-()]/g, '').trim();
+  }
+
+  return { formatDate, formatDateTime, fmt, el, qs, qsa, debounce, Validate, toast, normalizeMobile };
 })();

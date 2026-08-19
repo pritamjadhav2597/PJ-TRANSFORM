@@ -36,6 +36,7 @@
 
   async function startApp() {
     await Seed.ensureCurrentUser();
+    await WelcomeIntro.showIfNeeded();
     await Router.init();
   }
 

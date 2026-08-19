@@ -271,10 +271,21 @@ const Router = (() => {
       Utils.el('p', { class: 'topbar__subtitle' }, todaySubtitle()),
     ]));
 
+    const signOutBtn = Utils.el('button', {
+      class: 'topbar__signout', type: 'button', title: 'Sign out',
+      onClick: async () => {
+        if (typeof AuthService === 'undefined' || !AuthService.isConfigured()) return;
+        await SyncService.flush();
+        await AuthService.signOut();
+        window.location.reload();
+      },
+    }, 'Sign out');
+
     topbar.appendChild(Utils.el('div', { class: 'topbar__user' }, [
       Utils.el('div', { class: 'topbar__user-name' }, profile?.name || 'No profile yet'),
       Utils.el('div', { class: 'topbar__user-meta' },
         profile ? 'Your account' : 'Set up your profile'),
+      (typeof AuthService !== 'undefined' && AuthService.isConfigured()) ? signOutBtn : null,
     ]));
   }
 
@@ -283,9 +294,31 @@ const Router = (() => {
     return d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   }
 
+  // Paths reachable even with an incomplete profile — just the profile
+  // page itself, so onboarding can be finished. Signing out no longer
+  // requires a dedicated page — see the topbar's Sign out button above.
+  const ONBOARDING_EXEMPT_PATHS = new Set(['profile']);
+
   async function renderPage() {
     const path = currentPath();
     const route = findRoute(path);
+
+    // Onboarding gate — runs before anything else renders. A brand-new
+    // account (blank profile) or one still missing required fields gets
+    // redirected to the Profile page; nothing else in the app can produce
+    // real numbers (calorie targets, workout plans, etc.) without them.
+    if (!ONBOARDING_EXEMPT_PATHS.has(path)) {
+      const userId = DataService.getCurrentUserId();
+      const profile = userId ? (await DataService.profiles.list(p => p.userId === userId))[0] : null;
+      if (typeof PageProfile !== 'undefined' && !PageProfile.isComplete(profile)) {
+        if (typeof Utils !== 'undefined') {
+          Utils.toast('Please complete your profile to unlock the rest of the app.', 'info');
+        }
+        navigate('profile');
+        return;
+      }
+    }
+
     await renderSidebarNav();
     await renderTopbar(route);
 
