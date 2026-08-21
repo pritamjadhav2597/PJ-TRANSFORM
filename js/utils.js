@@ -98,13 +98,20 @@ const Utils = (() => {
     }, 3200);
   }
 
-  /** Strips spaces, dashes, and parens so the same number always matches
-   *  regardless of formatting (e.g. "+91 98765 43210" and "+919876543210"
-   *  normalize the same way). Keeps a leading "+" if present. Used both
-   *  when saving a profile's mobile number and when resolving it at
-   *  sign-in — see js/auth-service.js. */
+  /** Canonicalizes a mobile number so the same person's number always
+   *  matches regardless of how it was typed — with or without a country
+   *  code, spaces, dashes, parens, or a leading "+"/"0". Strips everything
+   *  down to digits, then keeps just the last 10, since that's the actual
+   *  subscriber number in India (and most countries) once any country
+   *  code / trunk prefix is set aside. So "+91 98765 43210", "919876543210",
+   *  "09876543210", and "9876543210" all normalize to "9876543210".
+   *  Used both when saving a profile's mobile number and when resolving it
+   *  at sign-in — see js/auth-service.js. Without this, a number saved with
+   *  a country code would never match the same number typed without one at
+   *  sign-in. */
   function normalizeMobile(value) {
-    return (value || '').replace(/[\s\-()]/g, '').trim();
+    const digits = (value || '').replace(/\D/g, '');
+    return digits.slice(-10);
   }
 
   return { formatDate, formatDateTime, fmt, el, qs, qsa, debounce, Validate, toast, normalizeMobile };
