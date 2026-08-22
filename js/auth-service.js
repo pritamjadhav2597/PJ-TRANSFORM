@@ -79,14 +79,10 @@ const AuthService = (() => {
   async function linkMobileNumber(mobileNumber) {
     if (!isConfigured()) return;
     const session = await getSession();
-    if (!session?.user?.id || !session?.user?.email) return;
+    if (!session?.user?.id) return;
     try {
-      await supabaseClient.from('phone_lookup').upsert({
-        mobile_number: mobileNumber,
-        user_id: session.user.id,
-        email: session.user.email,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'mobile_number' });
+      const { error } = await supabaseClient.rpc('link_mobile_number', { p_mobile: mobileNumber });
+      if (error) throw error;
     } catch (err) {
       console.error('linkMobileNumber failed', err);
     }
@@ -101,7 +97,8 @@ const AuthService = (() => {
     const session = await getSession();
     if (!session?.user?.id) return;
     try {
-      await supabaseClient.from('phone_lookup').delete().eq('mobile_number', mobileNumber).eq('user_id', session.user.id);
+      const { error } = await supabaseClient.rpc('unlink_mobile_number', { p_mobile: mobileNumber });
+      if (error) throw error;
     } catch (err) {
       console.error('unlinkMobileNumber failed', err);
     }
