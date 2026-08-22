@@ -52,6 +52,7 @@
       const previousAuthUserId = DataService.getLinkedAuthUserId();
       if (previousAuthUserId && previousAuthUserId !== session.user.id) {
         DataService.clearAll();
+        BiometricLock.disable(); // was enrolled for the previous person on this device, not this one
       }
       DataService.setLinkedAuthUserId(session.user.id);
 
@@ -59,6 +60,7 @@
       await SyncService.pullFromCloud(); // hydrate this device from the cloud, if there's anything there
     }
     await startApp();
+    IdleSession.start(() => AuthService.signOut());
 
     // Push any local changes before the tab closes / app backgrounds, so a
     // quick edit right before closing isn't lost.
@@ -91,8 +93,9 @@
   // Watch for sign-outs (including ones triggered from another tab) once the
   // app has actually started, and drop back to a clean sign-in screen.
   AuthService.onAuthStateChange((event) => {
-    if (event === 'SIGNED_OUT' && appHasStarted) {
-      window.location.reload();
+    if (event === 'SIGNED_OUT') {
+      IdleSession.clear();
+      if (appHasStarted) window.location.reload();
     }
   });
 
@@ -137,7 +140,27 @@
   // Normal case: no special email-link params — just check for an existing session.
   const existingSession = await AuthService.getSession();
   if (existingSession) {
-    await afterAuthenticated(existingSession);
+    if (IdleSession.hasBeenIdleTooLong()) {
+      // The person was away for more than 30 minutes (whether the tab sat
+      // idle or was fully closed and reopened) — sign out instead of
+      // silently resuming, then show a normal sign-in screen. onAuthStateChange
+      // above handles clearing the idle-session timestamp itself.
+      await AuthService.signOut();
+      AuthUI.render({ onAuthenticated: afterAuthenticated, initialNotice: 'You were signed out after being away for a while. Please sign in again.' });
+    } else if (BiometricLock.isEnabled()) {
+      // Quick unlock is set up on this device — the Supabase session is
+      // already valid (that's the real auth), this is just a local gate in
+      // front of it. "Use password instead" falls back to a full sign-in.
+      AuthUI.renderBiometricUnlock({
+        onUnlocked: () => afterAuthenticated(existingSession),
+        onUsePassword: async () => {
+          await AuthService.signOut();
+          AuthUI.render({ onAuthenticated: afterAuthenticated });
+        },
+      });
+    } else {
+      await afterAuthenticated(existingSession);
+    }
   } else {
     AuthUI.render({ onAuthenticated: afterAuthenticated });
   }

@@ -248,5 +248,67 @@ const AuthUI = (() => {
     wrap.appendChild(card);
   }
 
-  return { render, renderSetNewPassword };
+  /** Full-screen "quick unlock" gate shown instead of the normal sign-in
+   *  screen when biometric unlock is enabled on this device and there's
+   *  already a valid Supabase session to resume — see BiometricLock in
+   *  biometric-lock.js and how this is wired into the boot flow in app.js.
+   *  onUnlocked() resumes the existing session; onUsePassword() falls back
+   *  to a normal sign-in (e.g. the person's face isn't recognized, or
+   *  they'd rather not use biometrics right now). */
+  function renderBiometricUnlock({ onUnlocked, onUsePassword }) {
+    const app = document.getElementById('app');
+    app.innerHTML = '';
+
+    const wrap = Utils.el('div', { class: 'auth-screen' });
+    const card = Utils.el('div', { class: 'card auth-card auth-card--unlock' });
+
+    const brand = Utils.el('div', { class: 'auth-brand' }, [
+      Utils.el('span', { class: 'auth-brand__mark' }, '◐'),
+      Utils.el('span', { class: 'auth-brand__text' }, 'Transform'),
+    ]);
+    const icon = Utils.el('div', { class: 'auth-unlock__icon' }, '\uD83D\uDD12');
+    const title = Utils.el('h1', { class: 'auth-title' }, 'Welcome back');
+    const subtitle = Utils.el('p', { class: 'auth-subtitle' }, 'Unlock with Face ID, Touch ID, or your fingerprint to continue.');
+    const errorBox = Utils.el('div', { class: 'auth-notice', style: 'display:none;' });
+
+    const unlockBtn = Utils.el('button', { class: 'btn btn--primary auth-unlock__btn', type: 'button' }, 'Unlock');
+    const passwordLink = Utils.el('button', { class: 'link-button', type: 'button' }, 'Use password instead');
+
+    async function attemptUnlock() {
+      errorBox.style.display = 'none';
+      unlockBtn.disabled = true;
+      unlockBtn.textContent = 'Checking\u2026';
+      const success = await BiometricLock.verify();
+      unlockBtn.disabled = false;
+      unlockBtn.textContent = 'Unlock';
+      if (success) {
+        onUnlocked();
+      } else {
+        errorBox.textContent = 'Couldn\u2019t verify. Try again, or use your password.';
+        errorBox.style.display = 'block';
+      }
+    }
+
+    unlockBtn.addEventListener('click', attemptUnlock);
+    passwordLink.addEventListener('click', onUsePassword);
+
+    card.appendChild(brand);
+    card.appendChild(icon);
+    card.appendChild(title);
+    card.appendChild(subtitle);
+    card.appendChild(errorBox);
+    card.appendChild(unlockBtn);
+    card.appendChild(passwordLink);
+    wrap.appendChild(card);
+    app.appendChild(wrap);
+
+    // Prompt immediately on arrival — the person almost always wants this
+    // right away, and the extra tap otherwise adds friction to what's
+    // supposed to be the FAST path back into the app. If it fails or they
+    // dismiss it, the screen above (with its own "Unlock" button) is
+    // already there as a fallback rather than getting stuck.
+    attemptUnlock();
+  }
+
+  return { render, renderSetNewPassword, renderBiometricUnlock };
 })();

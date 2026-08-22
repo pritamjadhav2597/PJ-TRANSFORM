@@ -34,6 +34,7 @@
 <!-- Auth + sync (must load before storage-service, which calls into SyncService) -->
 <script src="js/supabase-config.js"></script>
 <script src="js/auth-service.js"></script>
+<script src="js/biometric-lock.js"></script>
 <script src="js/sync-service.js"></script>
 
 <!-- Foundation layer: models -> storage -> business logic -> utils -> seed -->
@@ -93,6 +94,7 @@
 
 <!-- Router + bootstrap -->
 <script src="js/router.js"></script>
+<script src="js/idle-session.js"></script>
 <script src="js/app.js"></script>
 
 <!-- PWA: register service worker for offline support -->

@@ -1,6 +1,6 @@
 // Service worker for Personal Transformation PWA
 // Bump this version any time app files change, to force cache refresh.
-const CACHE_VERSION = 'v14';
+const CACHE_VERSION = 'v19';
 const CACHE_NAME = `transform-app-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
@@ -15,6 +15,7 @@ const PRECACHE_URLS = [
   "js/app.js",
   "js/supabase-config.js",
   "js/auth-service.js",
+  "js/biometric-lock.js",
   "js/sync-service.js",
   "js/auth-ui.js",
   "js/welcome-intro.js",
@@ -60,6 +61,7 @@ const PRECACHE_URLS = [
   "js/recovery-engine.js",
   "js/reports-engine.js",
   "js/router.js",
+  "js/idle-session.js",
   "js/seed.js",
   "js/shopping-engine.js",
   "js/storage-service.js",

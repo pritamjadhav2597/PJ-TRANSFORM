@@ -24,7 +24,59 @@ const PageSettings = (() => {
 
     const profile = (await DataService.profiles.list(p => p.userId === userId))[0] || null;
     container.appendChild(renderNavOrderCard(profile, container));
+    container.appendChild(await renderSecurityCard(container));
     container.appendChild(await renderAccountCard());
+  }
+
+  async function renderSecurityCard(container) {
+    if (!AuthService.isConfigured()) return null; // quick unlock only makes sense on top of a real cloud session
+
+    const supported = await BiometricLock.isSupported();
+    const enabled = BiometricLock.isEnabled();
+
+    if (!supported) {
+      return Utils.el('section', { class: 'card' }, [
+        Utils.el('div', { class: 'card__header' }, Utils.el('h2', { class: 'card__title' }, 'Security')),
+        Utils.el('p', { class: 'card__subtitle' }, 'Face ID / fingerprint unlock isn\u2019t available on this device or browser.'),
+      ]);
+    }
+
+    const actionBtn = Utils.el('button', {
+      class: `btn ${enabled ? 'btn--secondary' : 'btn--primary'}`, type: 'button',
+      onClick: async () => {
+        if (enabled) {
+          BiometricLock.disable();
+          Utils.toast('Quick unlock turned off for this device.', 'success');
+          await renderInner(container);
+          return;
+        }
+        actionBtn.disabled = true;
+        actionBtn.textContent = 'Follow the prompt\u2026';
+        const session = await AuthService.getSession();
+        const result = await BiometricLock.enable(session?.user?.email);
+        if (result.ok) {
+          Utils.toast('Quick unlock is on for this device.', 'success');
+        } else if (result.reason === 'cancelled') {
+          Utils.toast('Setup cancelled.', 'error');
+        } else {
+          Utils.toast('Couldn\u2019t set up quick unlock on this device.', 'error');
+        }
+        await renderInner(container);
+      },
+    }, enabled ? 'Turn Off' : 'Set Up');
+
+    return Utils.el('section', { class: 'card' }, [
+      Utils.el('div', { class: 'card__header' }, [
+        Utils.el('div', {}, [
+          Utils.el('h2', { class: 'card__title' }, 'Security'),
+          Utils.el('p', { class: 'card__subtitle' },
+            enabled
+              ? 'Quick unlock is on for this device \u2014 opening the app (or returning after being away) will ask for Face ID / fingerprint instead of your password.'
+              : 'Turn on Face ID / fingerprint unlock for this device. Your password still protects your account \u2014 this is just a faster way back in on a device you already trust.'),
+        ]),
+        actionBtn,
+      ]),
+    ]);
   }
 
   async function renderAccountCard() {
