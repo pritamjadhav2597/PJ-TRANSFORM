@@ -1,6 +1,6 @@
 // Service worker for Personal Transformation PWA
 // Bump this version any time app files change, to force cache refresh.
-const CACHE_VERSION = 'v26';
+const CACHE_VERSION = 'v27';
 const CACHE_NAME = `transform-app-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [

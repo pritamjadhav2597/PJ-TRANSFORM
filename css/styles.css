@@ -1377,7 +1377,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
      dashboard.js. Desktop keeps the normal full-width topbar + hero
      (the min-width: 881px rule below makes this wrapper transparent to
      layout and hides the duplicate info block). */
-  .dash-mobile-head { display: flex; align-items: stretch; gap: 10px; margin-bottom: 4px; min-width: 0; }
+  .dash-mobile-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 4px; min-width: 0; }
   .dash-mobile-head__info {
     flex: 1 1 40%; min-width: 0; display: flex; flex-direction: column; justify-content: center;
     background: var(--moss-dark); color: #EAF1EC; border-radius: var(--radius-lg);
