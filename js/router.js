@@ -260,6 +260,7 @@ const Router = (() => {
     topbar.className = 'topbar';
     if (route.path === 'workout') topbar.classList.add('topbar--workout');
     else if (route.theme) topbar.classList.add(`topbar--${route.theme}`);
+    topbar.classList.add(`topbar--route-${route.path}`);
 
     const userId = DataService.getCurrentUserId();
     const profile = userId ? (await DataService.profiles.list(p => p.userId === userId))[0] : null;

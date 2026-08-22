@@ -49,7 +49,7 @@ const PageDashboard = (() => {
     // activity history) lives on its own dedicated page rather than being
     // duplicated here too.
     container.appendChild(Utils.el('div', { class: 'grid grid--dashboard' }, [
-      renderHeroCard(profile, program, currentPhase, daySummary, dailyScore, targets, counters),
+      renderMobileHeadRow(profile, program, currentPhase, daySummary, dailyScore, targets, counters),
       renderTrackerLinksCard(),
       renderStorySlideshowCard({ profile, program, targets, counters, dailyScore, workouts, recoveryEntries, sleepEntries }, today, container),
       renderTodayMissionCard(program, currentPhase, targets, daySummary, dailyScore),
@@ -123,6 +123,54 @@ const PageDashboard = (() => {
   // calculated independently, so it can never drift from the cards below it.
   // -----------------------------------------------------------------------
 
+
+  /** On mobile only, pairs a compact version of the page header (title,
+   *  date, name, sign out) side-by-side with the hero card, in place of the
+   *  full-width topbar sitting above everything — see the person's own
+   *  mockup for the exact target layout. On desktop this wrapper is inert
+   *  (display: contents unwraps it, .dash-mobile-head__info stays hidden)
+   *  so the real topbar and a normal full-width hero card are unaffected;
+   *  see the CSS for the media-query split. Duplicates a small amount of
+   *  what router.js already puts in the real topbar (title, date, name,
+   *  sign out) rather than trying to relocate that actual DOM node, which
+   *  would need to be moved back before any other page's topbar re-render. */
+  function renderMobileHeadRow(profile, program, currentPhase, daySummary, dailyScore, targets, counters) {
+    const heroCard = renderHeroCard(profile, program, currentPhase, daySummary, dailyScore, targets, counters);
+    if (!heroCard) return null;
+
+    const todaySubtitle = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+    const signOutBtn = Utils.el('button', {
+      class: 'dash-mobile-head__signout', type: 'button', title: 'Sign out',
+      onClick: async () => {
+        if (typeof AuthService === 'undefined' || !AuthService.isConfigured()) return;
+        await SyncService.flush();
+        await AuthService.signOut();
+        window.location.reload();
+      },
+    }, 'Sign out');
+
+    // The greeting headline ("Good evening, alpha.") and its subtitle live
+    // in the hero card by default (see renderHeroCard) — on this paired
+    // mobile layout they move into the info block instead, right under
+    // the name/account line, so the hero card's whole width goes to the
+    // stat tiles. Moved (not cloned) so there's exactly one live copy —
+    // Utils.el nodes with click handlers elsewhere wouldn't survive a clone.
+    const greetingEl = heroCard.querySelector('.hero__greeting');
+    const heroSubtitleEl = heroCard.querySelector('.hero__subtitle');
+
+    const info = Utils.el('div', { class: 'dash-mobile-head__info' }, [
+      Utils.el('h1', { class: 'dash-mobile-head__title' }, 'Dashboard'),
+      Utils.el('p', { class: 'dash-mobile-head__subtitle' }, todaySubtitle),
+      Utils.el('p', { class: 'dash-mobile-head__name' }, profile?.name || 'No profile yet'),
+      Utils.el('p', { class: 'dash-mobile-head__meta' }, profile ? 'Your account' : 'Set up your profile'),
+      greetingEl,
+      heroSubtitleEl,
+      (typeof AuthService !== 'undefined' && AuthService.isConfigured()) ? signOutBtn : null,
+    ].filter(Boolean));
+
+    return Utils.el('div', { class: 'dash-mobile-head' }, [info, heroCard]);
+  }
 
   function renderHeroCard(profile, program, currentPhase, daySummary, dailyScore, targets, counters) {
     const hour = new Date().getHours();

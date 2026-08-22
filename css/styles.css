@@ -1334,6 +1334,12 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
   .topbar { flex-direction: column; gap: 10px; padding: 20px 18px; }
   .topbar__user { align-items: flex-start; }
   .topbar__user-name, .topbar__user-meta { text-align: left; }
+
+  /* Dashboard only (not Profile, which shares the same theme class) — the
+     real topbar is replaced by .dash-mobile-head below, paired directly
+     with the hero card instead of sitting as its own full-width row. */
+  .topbar--route-dashboard { display: none; }
+
   .page { padding: 18px; }
   .day-ring { flex-direction: column; align-items: flex-start; }
   .card--hero { padding: 20px 16px; }
@@ -1358,6 +1364,47 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
   .hero__stat { padding: 8px 10px; }
   .hero__stat-value { font-size: 16px; }
   .hero__stat-label { margin-top: 2px; font-size: 9.5px; }
+
+  /* Mobile-only paired header + hero layout — see renderMobileHeadRow in
+     dashboard.js. Desktop keeps the normal full-width topbar + hero
+     (the min-width: 881px rule below makes this wrapper transparent to
+     layout and hides the duplicate info block). */
+  .dash-mobile-head { display: flex; align-items: stretch; gap: 10px; margin-bottom: 4px; }
+  .dash-mobile-head__info {
+    flex: 0 0 40%; display: flex; flex-direction: column; justify-content: center;
+    background: var(--moss-dark); color: #EAF1EC; border-radius: var(--radius-lg);
+    padding: 16px 14px;
+  }
+  .dash-mobile-head__title { font-family: var(--font-display); font-size: 20px; margin: 0 0 4px; color: #fff; }
+  .dash-mobile-head__subtitle { font-size: 10.5px; color: rgba(234,241,236,0.75); margin: 0 0 8px; line-height: 1.35; }
+  .dash-mobile-head__name { font-weight: 700; font-size: 13px; margin: 0; color: #fff; }
+  .dash-mobile-head__meta { font-size: 11px; color: rgba(234,241,236,0.65); margin: 0 0 8px; }
+  .dash-mobile-head__info .hero__greeting { font-size: 13px; margin: 0 0 3px; }
+  .dash-mobile-head__info .hero__subtitle { font-size: 9.5px; margin: 0 0 10px; color: rgba(234,241,236,0.7); }
+  .dash-mobile-head__signout {
+    align-self: flex-start; border: 1px solid rgba(234,241,236,0.35); background: transparent;
+    color: #EAF1EC; border-radius: 999px; padding: 6px 12px; font-size: 11.5px; font-weight: 600; cursor: pointer;
+  }
+  .dash-mobile-head__signout:hover { background: rgba(255,255,255,0.1); }
+  .dash-mobile-head .card--hero { flex: 1 1 60%; margin: 0; padding: 14px 12px; }
+  .dash-mobile-head .hero__eyebrow { font-size: 10px; margin-bottom: 4px; }
+  .dash-mobile-head .hero__goal { display: none; }
+  .dash-mobile-head .hero__cta { font-size: 11px; padding: 8px 12px; margin-top: 8px; }
+  .dash-mobile-head .hero__stats { gap: 6px; }
+  .dash-mobile-head .hero__stat { padding: 6px 8px; }
+  .dash-mobile-head .hero__stat-value { font-size: 13px; }
+  .dash-mobile-head .hero__stat-label { font-size: 8px; }
+  .dash-mobile-head .hero__ring-wrap { display: none; }
+}
+
+/* Desktop: the paired wrapper has no visual presence of its own — its
+   children (the hidden info block, plus the hero card) flow exactly as if
+   this wrapper weren't there, so the hero card sits as a normal full-width
+   grid item and the real topbar (never hidden at this width) is the only
+   header shown. */
+@media (min-width: 881px) {
+  .dash-mobile-head { display: contents; }
+  .dash-mobile-head__info { display: none; }
 }
 
 /* The close button and drawer-only chrome should never appear on desktop,
