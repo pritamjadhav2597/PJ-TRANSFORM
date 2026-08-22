@@ -1,6 +1,6 @@
 // Service worker for Personal Transformation PWA
 // Bump this version any time app files change, to force cache refresh.
-const CACHE_VERSION = 'v25';
+const CACHE_VERSION = 'v26';
 const CACHE_NAME = `transform-app-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
@@ -83,15 +83,16 @@ self.addEventListener('install', (event) => {
 // Activate: clean up old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
+    caches.keys()
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) => key !== CACHE_NAME)
+            .map((key) => caches.delete(key))
+        )
       )
-    )
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 // Fetch strategy:
@@ -99,6 +100,20 @@ self.addEventListener('activate', (event) => {
 // - Google Fonts / cross-origin: stale-while-revalidate.
 // - Navigation requests: network-first with cache fallback (so a rebuild is picked up
 //   when online, but the app still opens when offline).
+// Fetch strategy:
+// - Same-origin app files: cache-first, falling back to network, then updating cache.
+// - Google Fonts / cross-origin: stale-while-revalidate.
+// - Navigation requests: network-first with cache fallback (so a rebuild is picked up
+//   when online, but the app still opens when offline).
+//
+// IMPORTANT: every cache lookup/write below is explicitly scoped to
+// caches.open(CACHE_NAME) rather than the unscoped caches.match(req). The
+// unscoped form searches EVERY cache bucket still on the device, not just
+// the current version's — if the old version's cache hasn't finished being
+// deleted yet (the cleanup in 'activate' is async and can lag), it can
+// silently keep serving stale files from the old bucket indefinitely, even
+// once a new CACHE_VERSION is confirmed to exist. Scoping to CACHE_NAME
+// explicitly guarantees this version only ever reads/writes its own cache.
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
@@ -114,21 +129,27 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
           return res;
         })
-        .catch(() => caches.match(req).then((res) => res || caches.match('index.html')))
+        .catch(() =>
+          caches.open(CACHE_NAME).then((cache) =>
+            cache.match(req).then((res) => res || cache.match('index.html'))
+          )
+        )
     );
     return;
   }
 
   if (isSameOrigin) {
     event.respondWith(
-      caches.match(req).then((cached) => {
-        if (cached) return cached;
-        return fetch(req).then((res) => {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
-          return res;
-        });
-      })
+      caches.open(CACHE_NAME).then((cache) =>
+        cache.match(req).then((cached) => {
+          if (cached) return cached;
+          return fetch(req).then((res) => {
+            const clone = res.clone();
+            cache.put(req, clone);
+            return res;
+          });
+        })
+      )
     );
   } else {
     // Cross-origin (e.g. Google Fonts): stale-while-revalidate.
@@ -139,16 +160,18 @@ self.addEventListener('fetch', (event) => {
       return;
     }
     event.respondWith(
-      caches.match(req).then((cached) => {
-        const fetchPromise = fetch(req)
-          .then((res) => {
-            const clone = res.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(req, clone));
-            return res;
-          })
-          .catch(() => cached);
-        return cached || fetchPromise;
-      })
+      caches.open(CACHE_NAME).then((cache) =>
+        cache.match(req).then((cached) => {
+          const fetchPromise = fetch(req)
+            .then((res) => {
+              const clone = res.clone();
+              cache.put(req, clone);
+              return res;
+            })
+            .catch(() => cached);
+          return cached || fetchPromise;
+        })
+      )
     );
   }
 });
