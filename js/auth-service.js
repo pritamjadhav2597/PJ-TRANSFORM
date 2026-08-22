@@ -73,18 +73,26 @@ const AuthService = (() => {
   /** Links a mobile number to the currently signed-in account's email, so
    *  a future sign-in can use the mobile number instead of typing the email
    *  (see resolveEmailByMobile below). Called from the Profile page
-   *  whenever the mobile number field is saved. Silently no-ops if
-   *  Supabase isn't configured or nobody is signed in — this is a
-   *  convenience layer, not something the rest of the app depends on. */
+   *  whenever the mobile number field is saved. Returns { ok: true } on
+   *  success, or { ok: false, reason: 'taken' | 'error' } — 'taken' means
+   *  the number is already linked to a DIFFERENT account and the Profile
+   *  page should tell the person, since silently failing here would leave
+   *  them thinking mobile sign-in works when it doesn't. Silently no-ops
+   *  (returns { ok: true }) if Supabase isn't configured or nobody is
+   *  signed in — this is a convenience layer, not something the rest of
+   *  the app depends on. */
   async function linkMobileNumber(mobileNumber) {
-    if (!isConfigured()) return;
+    if (!isConfigured()) return { ok: true };
     const session = await getSession();
-    if (!session?.user?.id) return;
+    if (!session?.user?.id) return { ok: true };
     try {
       const { error } = await supabaseClient.rpc('link_mobile_number', { p_mobile: mobileNumber });
       if (error) throw error;
+      return { ok: true };
     } catch (err) {
+      const isTaken = /MOBILE_NUMBER_TAKEN/.test(err?.message || '');
       console.error('linkMobileNumber failed', err);
+      return { ok: false, reason: isTaken ? 'taken' : 'error' };
     }
   }
 

@@ -455,12 +455,17 @@ const PageProfile = (() => {
     // the one-time Supabase SQL setup (supabase-setup-phone-lookup.sql)
     // hadn't been run yet the first time someone saved their number, that
     // link silently failed, and without this it would stay silently
-    // missing forever. Best-effort either way: doesn't block the save or
-    // show its own errors, since email+password sign-in works regardless.
+    // missing forever. Doesn't block the save either way — email+password
+    // sign-in works regardless — but DOES warn if the number is already
+    // claimed by a different account, since silently failing there would
+    // leave the person thinking mobile sign-in works when it doesn't.
     const newMobile = Utils.normalizeMobile(patch.mobileNumber);
     const oldMobile = Utils.normalizeMobile(profile.mobileNumber);
     if (newMobile) {
-      AuthService.linkMobileNumber(newMobile);
+      const linkResult = await AuthService.linkMobileNumber(newMobile);
+      if (!linkResult.ok && linkResult.reason === 'taken') {
+        Utils.toast('This mobile number is already linked to another account, so it won\u2019t work for signing in here. Your profile was still saved.', 'error');
+      }
       if (oldMobile && oldMobile !== newMobile) AuthService.unlinkMobileNumber(oldMobile);
     } else if (oldMobile) {
       AuthService.unlinkMobileNumber(oldMobile);
