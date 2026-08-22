@@ -1395,6 +1395,8 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
   }
   .dash-mobile-head__signout:hover { background: rgba(255,255,255,0.1); }
   .dash-mobile-head .card--hero { flex: 1 1 60%; min-width: 0; margin: 0; padding: 14px 12px; }
+  .dash-mobile-head .hero__intro { min-width: 0; flex-basis: auto; }
+  .dash-mobile-head .hero__stats { min-width: 0; flex: 1 1 auto; }
   .dash-mobile-head .hero__eyebrow { font-size: 10px; margin-bottom: 4px; }
   .dash-mobile-head .hero__goal { display: none; }
   .dash-mobile-head .hero__cta { font-size: 11px; padding: 8px 12px; margin-top: 8px; }
