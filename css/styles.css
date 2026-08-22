@@ -1360,7 +1360,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
      like a dead end rather than something to keep scrolling/exploring. A
      fixed, denser 2-column grid with smaller tiles fits the same 7 numbers
      in roughly half the vertical space. */
-  .hero__stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex: none; }
+  .hero__stats { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; flex: none; }
   .hero__stat { padding: 8px 10px; }
   .hero__stat-value { font-size: 16px; }
   .hero__stat-label { margin-top: 2px; font-size: 9.5px; }
@@ -1371,9 +1371,9 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
      layout and hides the duplicate info block). */
   .dash-mobile-head { display: flex; align-items: stretch; gap: 10px; margin-bottom: 4px; }
   .dash-mobile-head__info {
-    flex: 0 0 40%; display: flex; flex-direction: column; justify-content: center;
+    flex: 1 1 40%; min-width: 0; display: flex; flex-direction: column; justify-content: center;
     background: var(--moss-dark); color: #EAF1EC; border-radius: var(--radius-lg);
-    padding: 16px 14px;
+    padding: 16px 14px; overflow-wrap: break-word;
   }
   .dash-mobile-head__title { font-family: var(--font-display); font-size: 20px; margin: 0 0 4px; color: #fff; }
   .dash-mobile-head__subtitle { font-size: 10.5px; color: rgba(234,241,236,0.75); margin: 0 0 8px; line-height: 1.35; }
@@ -1386,7 +1386,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
     color: #EAF1EC; border-radius: 999px; padding: 6px 12px; font-size: 11.5px; font-weight: 600; cursor: pointer;
   }
   .dash-mobile-head__signout:hover { background: rgba(255,255,255,0.1); }
-  .dash-mobile-head .card--hero { flex: 1 1 60%; margin: 0; padding: 14px 12px; }
+  .dash-mobile-head .card--hero { flex: 1 1 60%; min-width: 0; margin: 0; padding: 14px 12px; }
   .dash-mobile-head .hero__eyebrow { font-size: 10px; margin-bottom: 4px; }
   .dash-mobile-head .hero__goal { display: none; }
   .dash-mobile-head .hero__cta { font-size: 11px; padding: 8px 12px; margin-top: 8px; }
