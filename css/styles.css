@@ -210,6 +210,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
 .page {
   padding: 26px 36px 60px;
   flex: 1;
+  overflow-x: hidden; /* last-resort safety net: clips instead of letting the whole page scroll horizontally if any card's content ever forces overflow again */
 }
 .page--loading { opacity: 0.6; }
 
@@ -392,6 +393,13 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   align-items: start; /* a tall card (e.g. a long Schedule) no longer stretches its neighbors to match */
 }
+/* Grid items default to min-width:auto, meaning a card's own content can
+   force its track wider than the column actually has room for — the same
+   underlying bug fixed for .hero__stat tiles, just applied broadly here so
+   it can't quietly recur on any other dashboard card. minmax(280px, 1fr)
+   on the columns above already provides the real sizing; this just stops
+   content from overriding it. */
+.grid--dashboard > * { min-width: 0; }
 .stack { display: flex; flex-direction: column; gap: 18px; }
 
 /* Staggered entrance for dashboard cards. Respects prefers-reduced-motion
@@ -1369,7 +1377,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
      dashboard.js. Desktop keeps the normal full-width topbar + hero
      (the min-width: 881px rule below makes this wrapper transparent to
      layout and hides the duplicate info block). */
-  .dash-mobile-head { display: flex; align-items: stretch; gap: 10px; margin-bottom: 4px; }
+  .dash-mobile-head { display: flex; align-items: stretch; gap: 10px; margin-bottom: 4px; min-width: 0; }
   .dash-mobile-head__info {
     flex: 1 1 40%; min-width: 0; display: flex; flex-direction: column; justify-content: center;
     background: var(--moss-dark); color: #EAF1EC; border-radius: var(--radius-lg);
