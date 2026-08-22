@@ -692,6 +692,14 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
 .slideshow__dot { width: 7px; height: 7px; border-radius: 50%; border: none; background: rgba(244,247,242,0.3); cursor: pointer; padding: 0; }
 .slideshow__dot--active { background: var(--gold); width: 20px; border-radius: 4px; transition: width 0.2s ease; }
 
+.slideshow__layout-row { display: flex; justify-content: flex-end; padding: 10px 14px 0; }
+.slideshow__layout-toggle {
+  border: none; background: transparent; cursor: pointer; padding: 2px 0;
+  font-size: 11.5px; font-weight: 600; letter-spacing: 0.02em;
+  color: rgba(244,247,242,0.55); text-decoration: underline; text-underline-offset: 2px;
+}
+.slideshow__layout-toggle:hover { color: var(--gold-soft); }
+
 @media (max-width: 560px) {
   .slideshow__stage { min-height: 300px; }
   .slideshow__glass { padding: 20px 16px; }

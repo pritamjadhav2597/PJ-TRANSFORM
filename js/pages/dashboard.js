@@ -50,7 +50,7 @@ const PageDashboard = (() => {
     container.appendChild(Utils.el('div', { class: 'grid grid--dashboard' }, [
       renderHeroCard(profile, program, currentPhase, daySummary, dailyScore, targets, counters),
       renderTrackerLinksCard(),
-      renderStorySlideshowCard({ profile, program, targets, counters, dailyScore, workouts, recoveryEntries, sleepEntries }, today),
+      renderStorySlideshowCard({ profile, program, targets, counters, dailyScore, workouts, recoveryEntries, sleepEntries }, today, container),
       renderTodayMissionCard(program, currentPhase, targets, daySummary, dailyScore),
       renderQuickActionsCard(userId, today, container),
       await renderProgramJourneyCard(userId),
@@ -585,7 +585,15 @@ const PageDashboard = (() => {
    * direct DOM event listeners rather than a full page re-render per
    * interaction, so swipe/autoplay stay smooth.
    */
-  function renderStorySlideshowCard(ctx, today) {
+  // Two layouts for the story slideshow, switchable from a small link on
+  // the card itself and remembered per-profile via dashboardSlideshowLayout:
+  //   'classic' (default) — the original 5 slides, one per pillar.
+  //   'compact' — 4 slides; Transformation and Progress are merged into one
+  //     slide since both ultimately point at the /progress page and were
+  //     showing overlapping stats (weight change vs. % complete).
+  // Nothing on the /progress page itself changes either way — this only
+  // affects how many dashboard preview slides lead there.
+  function renderStorySlideshowCard(ctx, today, container) {
     const { profile, program, targets, counters, dailyScore, workouts, recoveryEntries, sleepEntries } = ctx;
     if (!profile) return null;
 
@@ -594,40 +602,64 @@ const PageDashboard = (() => {
     const recoveryTrend = RecoveryEngine.computeWeeklyTrend(recoveryEntries, 'recoveryScore', new Date(today + 'T00:00:00'));
     const lastSleep = sleepEntries.find(s => s.date === today) || null;
 
-    const slides = [
-      {
-        theme: 'transformation', eyebrow: 'Transformation', icon: '\uD83D\uDCF7', headline: 'See how far you\u2019ve come',
-        description: 'Compare your first photo against today, checkpoint by checkpoint.',
-        statLabel: 'Weight change', statValue: targets?.weightDifferenceKg != null ? formatSignedKg(targets.weightDifferenceKg) : 'No data entered',
-        primaryLabel: 'View Transformation', primaryHref: '#/progress', secondaryLabel: 'Add Photo', secondaryHref: '#/progress',
-      },
-      {
-        theme: 'training', eyebrow: 'Training', icon: '\uD83C\uDFCB\uFE0F', headline: 'Keep the streak alive',
-        description: 'Every session compounds — see today\u2019s plan and your recent consistency.',
-        statLabel: 'Workout streak', statValue: workoutStreak > 0 ? `${workoutStreak} day${workoutStreak === 1 ? '' : 's'}` : 'No data entered',
-        primaryLabel: 'Go to Workout', primaryHref: '#/workout', secondaryLabel: 'View History', secondaryHref: '#/workout',
-      },
-      {
-        theme: 'nutrition', eyebrow: 'Nutrition', icon: '\uD83C\uDF7D', headline: 'Fuel matches the goal',
-        description: 'Log today\u2019s meals to stay on target with your calculated macros.',
-        statLabel: 'Nutrition quality today', statValue: dailyScore.qualityScore != null ? `${dailyScore.qualityScore}%` : 'No data entered',
-        primaryLabel: 'Log Nutrition', primaryHref: '#/nutrition', secondaryLabel: 'View Diet', secondaryHref: '#/diet',
-      },
-      {
-        theme: 'progress', eyebrow: 'Progress', icon: '\uD83D\uDCC8', headline: 'Track the whole picture',
-        description: 'Weight, strength, measurements, and adherence — all in one place.',
-        statLabel: 'Program complete', statValue: pct != null ? `${pct}%` : 'No data entered',
-        primaryLabel: 'View Analytics', primaryHref: '#/progress', secondaryLabel: null, secondaryHref: null,
-      },
-      {
-        theme: 'recovery', eyebrow: 'Recovery', icon: '\u267B\uFE0F', headline: 'Recovery drives results',
-        description: 'Sleep, training load, and how you\u2019re really feeling — together.',
-        statLabel: 'Sleep last night', statValue: lastSleep?.hoursSlept != null ? `${lastSleep.hoursSlept} h` : (recoveryTrend.thisWeekAvg != null ? `Recovery avg ${recoveryTrend.thisWeekAvg}/5` : 'No data entered'),
-        primaryLabel: 'Go to Recovery', primaryHref: '#/recovery', secondaryLabel: null, secondaryHref: null,
-      },
-    ];
+    const transformationSlide = {
+      theme: 'transformation', eyebrow: 'Transformation', icon: '\uD83D\uDCF7', headline: 'See how far you\u2019ve come',
+      description: 'Compare your first photo against today, checkpoint by checkpoint.',
+      statLabel: 'Weight change', statValue: targets?.weightDifferenceKg != null ? formatSignedKg(targets.weightDifferenceKg) : 'No data entered',
+      primaryLabel: 'View Transformation', primaryHref: '#/progress', secondaryLabel: 'Add Photo', secondaryHref: '#/progress',
+    };
+    const trainingSlide = {
+      theme: 'training', eyebrow: 'Training', icon: '\uD83C\uDFCB\uFE0F', headline: 'Keep the streak alive',
+      description: 'Every session compounds — see today\u2019s plan and your recent consistency.',
+      statLabel: 'Workout streak', statValue: workoutStreak > 0 ? `${workoutStreak} day${workoutStreak === 1 ? '' : 's'}` : 'No data entered',
+      primaryLabel: 'Go to Workout', primaryHref: '#/workout', secondaryLabel: 'View History', secondaryHref: '#/workout',
+    };
+    const nutritionSlide = {
+      theme: 'nutrition', eyebrow: 'Nutrition', icon: '\uD83C\uDF7D', headline: 'Fuel matches the goal',
+      description: 'Log today\u2019s meals to stay on target with your calculated macros.',
+      statLabel: 'Nutrition quality today', statValue: dailyScore.qualityScore != null ? `${dailyScore.qualityScore}%` : 'No data entered',
+      primaryLabel: 'Log Nutrition', primaryHref: '#/nutrition', secondaryLabel: 'View Diet', secondaryHref: '#/diet',
+    };
+    const progressSlide = {
+      theme: 'progress', eyebrow: 'Progress', icon: '\uD83D\uDCC8', headline: 'Track the whole picture',
+      description: 'Weight, strength, measurements, and adherence — all in one place.',
+      statLabel: 'Program complete', statValue: pct != null ? `${pct}%` : 'No data entered',
+      primaryLabel: 'View Analytics', primaryHref: '#/progress', secondaryLabel: null, secondaryHref: null,
+    };
+    const recoverySlide = {
+      theme: 'recovery', eyebrow: 'Recovery', icon: '\u267B\uFE0F', headline: 'Recovery drives results',
+      description: 'Sleep, training load, and how you\u2019re really feeling — together.',
+      statLabel: 'Sleep last night', statValue: lastSleep?.hoursSlept != null ? `${lastSleep.hoursSlept} h` : (recoveryTrend.thisWeekAvg != null ? `Recovery avg ${recoveryTrend.thisWeekAvg}/5` : 'No data entered'),
+      primaryLabel: 'Go to Recovery', primaryHref: '#/recovery', secondaryLabel: null, secondaryHref: null,
+    };
+    const transformationAndProgressSlide = {
+      theme: 'transformation', eyebrow: 'Transformation & Progress', icon: '\uD83D\uDCC8', headline: 'See how far you\u2019ve come',
+      description: 'Photos, weight, strength, measurements, and adherence — the whole picture in one place.',
+      statLabel: 'Weight change', statValue: targets?.weightDifferenceKg != null ? formatSignedKg(targets.weightDifferenceKg) : (pct != null ? `${pct}% complete` : 'No data entered'),
+      primaryLabel: 'View Progress', primaryHref: '#/progress', secondaryLabel: 'Add Photo', secondaryHref: '#/progress',
+    };
 
-    return buildSlideshow(slides);
+    const layout = profile.dashboardSlideshowLayout === 'compact' ? 'compact' : 'classic';
+    const slides = layout === 'compact'
+      ? [transformationAndProgressSlide, trainingSlide, nutritionSlide, recoverySlide]
+      : [transformationSlide, trainingSlide, nutritionSlide, progressSlide, recoverySlide];
+
+    const toggleLink = Utils.el('button', {
+      class: 'slideshow__layout-toggle', type: 'button',
+    }, layout === 'compact' ? 'Back to classic (5 slides)' : 'Try compact layout (4 slides)');
+    toggleLink.addEventListener('click', async () => {
+      await DataService.profiles.update(profile.profileId, {
+        dashboardSlideshowLayout: layout === 'compact' ? 'classic' : 'compact',
+      });
+      await render(container);
+    });
+
+    const card = buildSlideshow(slides);
+    card.insertBefore(
+      Utils.el('div', { class: 'slideshow__layout-row' }, [toggleLink]),
+      card.firstChild
+    );
+    return card;
   }
 
   function buildSlideshow(slides) {
