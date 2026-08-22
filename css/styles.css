@@ -1361,7 +1361,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
      fixed, denser 2-column grid with smaller tiles fits the same 7 numbers
      in roughly half the vertical space. */
   .hero__stats { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; flex: none; }
-  .hero__stat { padding: 8px 10px; }
+  .hero__stat { padding: 8px 10px; min-width: 0; }
   .hero__stat-value { font-size: 16px; }
   .hero__stat-label { margin-top: 2px; font-size: 9.5px; }
 
@@ -1392,8 +1392,8 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
   .dash-mobile-head .hero__cta { font-size: 11px; padding: 8px 12px; margin-top: 8px; }
   .dash-mobile-head .hero__stats { gap: 6px; }
   .dash-mobile-head .hero__stat { padding: 6px 8px; }
-  .dash-mobile-head .hero__stat-value { font-size: 13px; }
-  .dash-mobile-head .hero__stat-label { font-size: 8px; }
+  .dash-mobile-head .hero__stat-value { font-size: 13px; overflow-wrap: break-word; }
+  .dash-mobile-head .hero__stat-label { font-size: 8px; overflow-wrap: break-word; }
   .dash-mobile-head .hero__ring-wrap { display: none; }
 }
 
