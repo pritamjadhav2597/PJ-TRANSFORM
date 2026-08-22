@@ -50,6 +50,22 @@ create policy "Users can delete their own phone lookup"
   for delete
   using (auth.uid() = user_id);
 
+-- RLS policies alone only control WHICH rows a role can touch — Postgres
+-- checks table-level privileges FIRST, and without an explicit GRANT here,
+-- "authenticated" has no permission to write to this table at all, so
+-- every insert/update/delete is silently blocked before RLS ever runs.
+grant insert, update, delete on public.phone_lookup to authenticated;
+
+-- The app's linkMobileNumber() uses an upsert (INSERT ... ON CONFLICT DO
+-- UPDATE) so re-saving the same number doesn't create duplicate rows.
+-- PostgreSQL requires SELECT privilege on the table to even attempt an
+-- ON CONFLICT check, independent of RLS — without it, every upsert fails
+-- with "new row violates row-level security policy", which looks like an
+-- RLS bug but is actually this missing grant. This does NOT let anyone
+-- browse the table's contents: there's still no SELECT *policy* below, so
+-- RLS continues to block all direct reads either way.
+grant select on public.phone_lookup to authenticated;
+
 -- Deliberately no SELECT policy — direct table reads are blocked for
 -- everyone. Lookups only happen through this function, which returns just
 -- an email string (or null), for exactly one mobile number at a time.
@@ -63,3 +79,10 @@ as $$
 $$;
 
 grant execute on function public.get_email_by_mobile(text) to anon, authenticated;
+
+-- Supabase's API layer (PostgREST) caches table grants/policies and doesn't
+-- always pick up GRANT/policy changes right away. Without this, mobile
+-- sign-in linking can keep failing with a confusing "row-level security"
+-- error for a while after running this script, even though everything
+-- above is correct. This tells it to refresh immediately.
+notify pgrst, 'reload schema';
