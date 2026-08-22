@@ -2004,6 +2004,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; }
   display: flex; align-items: center; justify-content: center;
 }
 
+
 @media (max-width: 560px) {
   .video-pip { left: 12px; right: 12px; bottom: 12px; width: auto; }
 }

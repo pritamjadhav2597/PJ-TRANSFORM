@@ -11,6 +11,7 @@ const PageDashboard = (() => {
   let expandedScheduleItemId = null; // which Schedule row is showing its edit form; null = all collapsed (compact list)
 
   async function render(container) {
+    container.innerHTML = '';
     const userId = DataService.getCurrentUserId();
     const profile = userId ? (await DataService.profiles.list(p => p.userId === userId))[0] : null;
     const program = userId ? (await DataService.programs.list(p => p.userId === userId && p.status === 'active'))[0] : null;
